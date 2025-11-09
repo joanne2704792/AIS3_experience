@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>查看網頁原始碼 | Web Source Viewer</title>
+  <meta name="description" content="在手機上快速查看任何網址的網頁原始碼（HTML）。適用 GitHub Pages。" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --brand: #3b82f6;
+      --danger: #ef4444;
+      --ok: #22c55e;
+      --code-bg: #0b1020;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, var(--bg), #0b1220);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    header { text-align:center; padding: 28px 16px 16px; }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: .2px; }
+    header p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+
+    .container { width: min(960px, 100%); margin: 0 auto; padding: 16px; }
+
+    .card {
+      background: rgba(17,24,39,.6);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.35);
+      overflow: hidden;
+    }
+    .controls { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px; }
+
+    .input {
+      background: #0b1220;
+      color: var(--text);
+      border: 1px solid rgba(148,163,184,.25);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 16px;
+      outline: none;
+    }
+    .input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+
+    .btn {
+      appearance: none;
+      border: 0; border-radius: 12px;
+      background: var(--brand);
+      color: #fff;
+      padding: 12px 16px;
+      font-size: 16px; font-weight: 600;
+    }
+    .btn[disabled] { opacity: .6; }
+
+    .toolbar {
+      display: flex; gap: 8px; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-top: 1px solid rgba(148,163,184,.15);
+      background: rgba(2,6,23,.6);
+    }
+    .toolbar-left { display:flex; gap:8px; align-items:center; }
+    .pill { font-size: 12px; color: var(--muted); border:1px solid rgba(148,163,184,.2); padding: 6px 10px; border-radius: 999px; }
+    .ghost { background: transparent; border:1px solid rgba(148,163,184,.25); color: var(--text); padding: 8px 12px; border-radius: 10px; }
+
+    pre { margin: 0; max-height: calc(100dvh - 250px); overflow: auto; background: var(--code-bg); padding: 14px; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 13px; }
+
+    .status { font-size: 13px; color: var(--muted); }
+    .error { color: #fecaca; }
+    .success { color: #bbf7d0; }
+    .link { color: #93c5fd; text-decoration: underline; text-underline-offset: 2px; }
+
+    footer { text-align:center; color: var(--muted); font-size: 12px; padding: 18px 10px 30px; }
+  </style>
+  <!-- highlight.js for syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/base16/zenburn.min.css" integrity="sha512-ZYuXVDFsIuP3qNfA1S0v7o+UMx0ZEE5fRZ9TQOoTqHe9V9S0wQ1Wytz8i0Jp8i1h9qP3Q6eKJ0i7aY9u29v3qg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-7z2z5ZxWkYQ5cVx6kyoT3e9Wk3t7mWmB11q0S8t7x9vYkEwVFnv7+1pQy9Wk0QyUCBT0F8xq1r7W8o6c2g0LZg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+  <header>
+    <h1>查看網頁原始碼</h1>
+    <p>在 iPhone / 行動瀏覽器上貼上網址，一鍵顯示該頁面的 HTML 原始碼</p>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <div class="controls">
+        <input id="urlInput" class="input" type="url" inputmode="url" placeholder="輸入網址，例如：https://example.com" autocomplete="on" />
+        <button id="fetchBtn" class="btn">查看</button>
+      </div>
+
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <span id="status" class="status">待命中…</span>
+        </div>
+        <div class="toolbar-right" style="display:flex; gap:8px;">
+          <button id="copyBtn" class="ghost" title="複製原始碼">複製</button>
+          <button id="downloadBtn" class="ghost" title="下載為 .html">下載</button>
+        </div>
+      </div>
+
+      <pre><code id="output" class="language-html">輸入網址後按「查看」。</code></pre>
+    </section>
+
+    <footer>
+      本工具使用公共代理服務 AllOrigins 以解決 CORS 問題。若個別網站設有防抓取機制，可能無法取得原始碼。
+    </footer>
+  </main>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const urlInput = $("#urlInput");
+    const fetchBtn = $("#fetchBtn");
+    const output = $("#output");
+    const statusEl = $("#status");
+    const copyBtn = $("#copyBtn");
+    const downloadBtn = $("#downloadBtn");
+
+    function normalizeUrl(value) {
+      if (!value) return "";
+      const trimmed = value.trim();
+      if (/^https?:\/\//i.test(trimmed)) return trimmed;
+      // 如果沒有協定，預設加上 https://
+      return `https://${trimmed}`;
+    }
+
+    async function fetchSource() {
+      const raw = urlInput.value;
+      const target = normalizeUrl(raw);
+      if (!target) { alert("請輸入網址"); return; }
+
+      fetchBtn.disabled = true;
+      statusEl.textContent = "抓取中…";
+      output.textContent = "";
+
+      try {
+        // 公開代理（受限於服務可用性）
+        const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`;
+        const res = await fetch(proxy, { method: 'GET' });
+        if (!res.ok) throw new Error(`代理服務回應狀態 ${res.status}`);
+        const text = await res.text();
+
+        output.textContent = text;
+        statusEl.innerHTML = `成功載入 <span class="success">${new URL(target).hostname}</span> 的原始碼（${text.length.toLocaleString()} 字元）`;
+        try { hljs.highlightElement(output); } catch {}
+      } catch (err) {
+        console.error(err);
+        statusEl.innerHTML = `發生錯誤：<span class="error">${err.message}</span>`;
+        output.textContent = `// 無法取得 ${target} 的原始碼\n// 錯誤：${err.message}`;
+      } finally {
+        fetchBtn.disabled = false;
+      }
+    }
+
+    async function copySource() {
+      try {
+        const text = output.textContent || "";
+        if (!text) return;
+        await navigator.clipboard.writeText(text);
+        statusEl.textContent = "已複製到剪貼簿";
+      } catch {
+        statusEl.textContent = "複製失敗，請手動選取";
+      }
+    }
+
+    function downloadSource() {
+      const text = output.textContent || "";
+      if (!text) return;
+      const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const host = (()=>{ try { return new URL(normalizeUrl(urlInput.value)).hostname; } catch { return 'source'; } })();
+      a.href = url;
+      a.download = `${host}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      statusEl.textContent = "下載已開始";
+    }
+
+    // 事件
+    fetchBtn.addEventListener('click', fetchSource);
+    copyBtn.addEventListener('click', copySource);
+    downloadBtn.addEventListener('click', downloadSource);
+    urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') fetchSource(); });
+
+    // 如果網址帶有 ?url= 參數，啟動時自動抓取
+    const params = new URLSearchParams(location.search);
+    const preset = params.get('url');
+    if (preset) {
+      urlInput.value = preset;
+      fetchSource();
+    }
+  </script>
+</body>
+</html>
